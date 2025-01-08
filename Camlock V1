@@ -1,0 +1,70 @@
+local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local trackingEnabled = false -- when join you need to toggle it first
+
+-- Add update rate control
+local updateRate = 1/60 -- default 60/s
+local lastUpdateTime = 0
+
+local function getNearestPlayer()
+    local nearestPlayer = nil
+    local shortestDistance = math.huge
+    for _, otherPlayer in pairs(game.Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (player.Character.HumanoidRootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance and distance <= 25 then -- adjust yo range here
+                shortestDistance = distance
+                nearestPlayer = otherPlayer
+            end
+        end
+    end
+    return nearestPlayer
+end
+
+-- Function to set update rate
+local function setUpdateRate(fps)
+    updateRate = 1/fps
+end
+
+-- toggle the camera tracking mode on or off
+local function toggleCameraTracking()
+    trackingEnabled = not trackingEnabled
+end
+
+-- Add keybinds for adjusting update rate
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end 
+    if input.KeyCode == Enum.KeyCode.R then
+        toggleCameraTracking() 
+    elseif input.KeyCode == Enum.KeyCode.RightBracket then -- Increase update rate
+        setUpdateRate(1/updateRate + 10) -- Increase by 10 FPS
+    elseif input.KeyCode == Enum.KeyCode.LeftBracket then -- Decrease update rate
+        local newFPS = math.max(1, 1/updateRate - 10) -- Decrease by 10 FPS, minimum 1 FPS
+        setUpdateRate(newFPS)
+    end
+end)
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if not trackingEnabled then
+        camera.CameraType = Enum.CameraType.Custom
+        return
+    end
+    
+    local currentTime = tick()
+    if currentTime - lastUpdateTime < updateRate then
+        return
+    end
+    lastUpdateTime = currentTime
+    
+    if (camera.CFrame.Position - player.Character.Head.Position).Magnitude < 1 then
+        local nearestPlayer = getNearestPlayer()
+        if nearestPlayer and nearestPlayer.Character and nearestPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPosition = nearestPlayer.Character.HumanoidRootPart.Position
+            camera.CFrame = CFrame.new(camera.CFrame.Position, targetPosition)
+        else
+            camera.CameraType = Enum.CameraType.Custom
+        end
+    else
+        camera.CameraType = Enum.CameraType.Custom
+    end
+end)
